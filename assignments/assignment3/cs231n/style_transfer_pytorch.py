@@ -25,8 +25,9 @@ def content_loss(content_weight, content_current, content_original):
     - scalar content loss
     """
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
+    content_loss = content_weight * torch.sum(torch.square(content_current-content_original))
+    
+    return content_loss
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -45,8 +46,14 @@ def gram_matrix(features, normalize=True):
       (optionally normalized) Gram matrices for the N input images.
     """
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    N,C,H,W = features.size()
+    features_flat = features.clone().view(N,C,H*W)
+    #torch.mm requires 2D matrices wheras torch.matmul doesn't
+    gram = torch.matmul(features_flat,features_flat.permute(0,2,1))
+    if normalize == True:
+      gram = gram.div(H*W*C)
+    return gram
 
-    pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -72,8 +79,13 @@ def style_loss(feats, style_layers, style_targets, style_weights):
     # Hint: you can do this with one for loop over the style layers, and should
     # not be very much code (~5 lines). You will need to use your gram_matrix function.
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
+    style_loss = []
+    for i in range(len(style_layers)):
+      g_i = gram_matrix(feats[style_layers[i]],normalize=True)
+      a_i = style_targets[i]
+      l_i = style_weights[i]*torch.sum(torch.square(a_i-g_i),(1,2))
+      style_loss.append(l_i)
+    return sum(style_loss)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -91,9 +103,15 @@ def tv_loss(img, tv_weight):
     """
     # Your implementation should be vectorized and not require any loops!
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+    img_shift_h = torch.roll(img,shifts=1,dims=(2))
+    img_shift_w = torch.roll(img,shifts=1,dims=(3))
+    #torch.roll : elements that are shifted beyond the last position are reintroduced at the first
+    #therefore, the first element of the shifted tensor along the shifted dimension is not a spatial neighbour
+    #of the first element of the input tensor along that dimension, this element must be removed from both tensors
+    tv_loss_h = torch.sum(torch.square(img_shift_h[:,:,1:,:] - img[:,:,1:,:]),(1,2,3))
+    tv_loss_w = torch.sum(torch.square(img_shift_w[:,:,:,1:] - img[:,:,:,1:]),(1,2,3))
+    tv_loss = tv_weight*(tv_loss_h + tv_loss_w)
+    return tv_loss
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 def preprocess(img, size=512):
     """ Preprocesses a PIL JPG Image object to become a Pytorch tensor
